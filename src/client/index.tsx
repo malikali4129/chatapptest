@@ -91,6 +91,30 @@ function App() {
 		}
 	};
 
+	const launchSession = () => {
+		const cleanedName = draftName.trim() || seedName;
+		const generatedRoom = nanoid(10);
+		setDraftRoom(generatedRoom);
+		setActiveName(cleanedName);
+		setHasEntered(true);
+		navigate(`/${generatedRoom}`);
+	};
+
+	const joinSession = () => {
+		const cleanedName = draftName.trim() || seedName;
+		const cleanedRoom = draftRoom.trim();
+		if (!cleanedRoom) {
+			setTimedFeedback("Enter a room code to join, or use Launch Session.");
+			return;
+		}
+
+		setActiveName(cleanedName);
+		setHasEntered(true);
+		if (cleanedRoom !== activeRoom) {
+			navigate(`/${cleanedRoom}`);
+		}
+	};
+
 	const socket = usePartySocket({
 		party: "chat",
 		room: hasEntered ? activeRoom : undefined,
@@ -151,23 +175,15 @@ function App() {
 						Pulse <span>Portal</span>
 					</h1>
 					<p className="launch-subtitle">
-						Spin up a shared realtime room in seconds. Pick your identity,
-						confirm the room code, and launch.
+						Start from this home screen, set your identity, then launch a new
+						session or join an existing room code.
 					</p>
 
 					<form
 						className="launch-form"
 						onSubmit={(event) => {
 							event.preventDefault();
-							const cleanedName = draftName.trim() || seedName;
-							const cleanedRoom = draftRoom.trim() || nanoid(10);
-
-							if (cleanedRoom !== activeRoom) {
-								navigate(`/${cleanedRoom}`);
-							}
-
-							setActiveName(cleanedName);
-							setHasEntered(true);
+							joinSession();
 						}}
 					>
 						<label className="launch-label" htmlFor="display-name">
@@ -193,15 +209,22 @@ function App() {
 							value={draftRoom}
 							onChange={(event) => setDraftRoom(event.currentTarget.value)}
 							autoComplete="off"
-							placeholder="example-room-42"
-							required
+							placeholder="Enter code to join an existing room"
 						/>
+						<p className="launch-hint">
+							No room code yet? Use Launch Session to create one.
+						</p>
 
 						<div className="launch-actions">
-							<button type="submit">Enter Room</button>
+							<button type="button" onClick={launchSession}>
+								Launch Session
+							</button>
+							<button type="submit" className="ghost">
+								Join Session
+							</button>
 							<button
 								type="button"
-								className="ghost"
+								className="ghost subtle"
 								onClick={() => shareInvite(draftRoom)}
 							>
 								Share Invite
@@ -274,33 +297,32 @@ function App() {
 
 				<form
 					className="composer"
-				onSubmit={(e) => {
-					e.preventDefault();
-					const content = e.currentTarget.elements.namedItem(
-						"content",
-					) as HTMLInputElement;
-					const text = content.value.trim();
-					if (!text) {
-						return;
-					}
-					const chatMessage: ChatMessage = {
-						id: nanoid(8),
-						content: text,
-						user: activeName,
-						role: "user",
-					};
-					setMessages((messages) => [...messages, chatMessage]);
-					// we could broadcast the message here
+					onSubmit={(e) => {
+						e.preventDefault();
+						const content = e.currentTarget.elements.namedItem(
+							"content",
+						) as HTMLInputElement;
+						const text = content.value.trim();
+						if (!text) {
+							return;
+						}
+						const chatMessage: ChatMessage = {
+							id: nanoid(8),
+							content: text,
+							user: activeName,
+							role: "user",
+						};
+						setMessages((messages) => [...messages, chatMessage]);
 
-					socket.send(
-						JSON.stringify({
-							type: "add",
-							...chatMessage,
-						} satisfies Message),
-					);
+						socket.send(
+							JSON.stringify({
+								type: "add",
+								...chatMessage,
+							} satisfies Message),
+						);
 
-					content.value = "";
-				}}
+						content.value = "";
+					}}
 				>
 					<input
 						type="text"
@@ -319,7 +341,7 @@ function App() {
 createRoot(document.getElementById("root")!).render(
 	<BrowserRouter>
 		<Routes>
-			<Route path="/" element={<Navigate to={`/${nanoid()}`} />} />
+			<Route path="/" element={<App />} />
 			<Route path="/:room" element={<App />} />
 			<Route path="*" element={<Navigate to="/" />} />
 		</Routes>

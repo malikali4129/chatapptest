@@ -159,6 +159,12 @@ body {
 	flex-wrap: wrap;
 }
 
+.launch-hint {
+	margin: 0;
+	font-size: 0.82rem;
+	color: rgba(152, 191, 206, 0.86);
+}
+
 .launch-actions button,
 .share-room-button {
 	border-radius: 11px;
@@ -192,6 +198,11 @@ body {
 	border-color: rgba(69, 224, 255, 0.4);
 	color: var(--text);
 	box-shadow: none;
+}
+
+.launch-actions button.ghost.subtle {
+	border-color: rgba(152, 191, 206, 0.34);
+	color: rgba(231, 248, 255, 0.92);
 }
 
 .share-feedback {
