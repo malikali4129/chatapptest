@@ -1,3 +1,5 @@
+@import url("https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700&family=Sora:wght@400;600;700&display=swap");
+
 :root {
 	--bg-0: #081018;
 	--bg-1: #0f1f2f;
@@ -38,6 +40,165 @@ body {
 		linear-gradient(130deg, var(--bg-0), var(--bg-1) 45%, var(--bg-2));
 	background-attachment: fixed;
 	overflow: hidden;
+}
+
+.launch-screen {
+	position: relative;
+	min-height: 100%;
+	display: grid;
+	place-items: center;
+	padding: 20px;
+	z-index: 1;
+	animation: fadeIn 0.6s ease-out;
+}
+
+.launch-grid {
+	position: absolute;
+	inset: 0;
+	z-index: -1;
+	background-image:
+		linear-gradient(rgba(69, 224, 255, 0.09) 1px, transparent 1px),
+		linear-gradient(90deg, rgba(69, 224, 255, 0.09) 1px, transparent 1px);
+	background-size: 42px 42px;
+	mask-image: radial-gradient(circle at center, black 35%, transparent 90%);
+	animation: drift 24s linear infinite;
+}
+
+.launch-shell {
+	width: min(720px, 96vw);
+	background: linear-gradient(145deg, rgba(7, 22, 35, 0.94), rgba(7, 14, 26, 0.82));
+	border: 1px solid rgba(69, 224, 255, 0.28);
+	border-radius: 26px;
+	box-shadow:
+		0 30px 65px rgba(4, 10, 16, 0.62),
+		inset 0 0 40px rgba(17, 67, 92, 0.34);
+	padding: 34px;
+	position: relative;
+	overflow: hidden;
+	backdrop-filter: blur(12px);
+	animation: slideUp 0.7s ease;
+}
+
+.launch-shell::before {
+	content: "";
+	position: absolute;
+	inset: 0;
+	background: linear-gradient(120deg, transparent, rgba(69, 224, 255, 0.1), transparent);
+	transform: translateX(-100%);
+	animation: scan 6s ease-in-out infinite;
+	pointer-events: none;
+}
+
+.launch-kicker {
+	margin: 0;
+	font-family: "Orbitron", "Sora", sans-serif;
+	font-size: 0.74rem;
+	letter-spacing: 2.2px;
+	color: var(--accent);
+	text-transform: uppercase;
+}
+
+.launch-title {
+	margin: 8px 0 12px;
+	font-family: "Orbitron", "Sora", sans-serif;
+	font-size: clamp(2rem, 5vw, 3.2rem);
+	line-height: 1.03;
+	letter-spacing: 0.6px;
+}
+
+.launch-title span {
+	color: var(--accent-2);
+	text-shadow: 0 0 22px rgba(24, 240, 176, 0.4);
+}
+
+.launch-subtitle {
+	margin: 0;
+	max-width: 560px;
+	color: var(--muted);
+	line-height: 1.65;
+	font-size: 0.98rem;
+}
+
+.launch-form {
+	margin-top: 26px;
+	display: grid;
+	gap: 11px;
+}
+
+.launch-label {
+	font-size: 0.77rem;
+	letter-spacing: 1.2px;
+	text-transform: uppercase;
+	color: rgba(152, 191, 206, 0.84);
+	font-weight: 600;
+}
+
+.launch-form input {
+	width: 100%;
+	border-radius: 12px;
+	border: 1px solid rgba(152, 191, 206, 0.3);
+	padding: 12px 14px;
+	background: rgba(8, 27, 40, 0.74);
+	color: var(--text);
+	font-size: 0.95rem;
+	outline: none;
+	transition:
+		border-color 0.2s ease,
+		box-shadow 0.2s ease;
+}
+
+.launch-form input:focus {
+	border-color: var(--accent);
+	box-shadow: 0 0 0 3px var(--ring);
+}
+
+.launch-actions {
+	margin-top: 6px;
+	display: flex;
+	gap: 10px;
+	flex-wrap: wrap;
+}
+
+.launch-actions button,
+.share-room-button {
+	border-radius: 11px;
+	border: 1px solid transparent;
+	padding: 11px 16px;
+	font-weight: 700;
+	letter-spacing: 0.3px;
+	cursor: pointer;
+	background: linear-gradient(120deg, #1db7dc, #13de9f);
+	color: #052330;
+	transition:
+		transform 0.12s ease,
+		filter 0.2s ease,
+		box-shadow 0.2s ease;
+	box-shadow: 0 8px 20px rgba(17, 137, 163, 0.35);
+}
+
+.launch-actions button:hover,
+.share-room-button:hover {
+	filter: brightness(1.08);
+	box-shadow: 0 10px 24px rgba(17, 137, 163, 0.45);
+}
+
+.launch-actions button:active,
+.share-room-button:active {
+	transform: translateY(1px);
+}
+
+.launch-actions button.ghost {
+	background: rgba(8, 31, 47, 0.72);
+	border-color: rgba(69, 224, 255, 0.4);
+	color: var(--text);
+	box-shadow: none;
+}
+
+.share-feedback {
+	margin: 14px 0 0;
+	font-size: 0.88rem;
+	color: var(--accent);
+	min-height: 1.2em;
 }
 
 body::before,
@@ -165,6 +326,7 @@ body::after {
 	display: flex;
 	gap: 8px;
 	align-items: center;
+	margin-top: 4px;
 }
 
 .chat-status::before {
@@ -292,6 +454,18 @@ body::after {
 }
 
 @media (max-width: 980px) {
+	.launch-shell {
+		padding: 22px;
+	}
+
+	.launch-actions {
+		flex-direction: column;
+	}
+
+	.launch-actions button {
+		width: 100%;
+	}
+
 	.app {
 		grid-template-columns: 1fr;
 		padding: 16px;
@@ -312,6 +486,10 @@ body::after {
 
 	.message {
 		max-width: 88%;
+	}
+
+	.share-room-button {
+		padding: 9px 12px;
 	}
 }
 
@@ -373,5 +551,24 @@ body::after {
 	}
 	50% {
 		transform: rotate(18deg) translateY(10px);
+	}
+}
+
+@keyframes scan {
+	0% {
+		transform: translateX(-100%);
+	}
+	45%,
+	100% {
+		transform: translateX(100%);
+	}
+}
+
+@keyframes drift {
+	from {
+		transform: translateY(0);
+	}
+	to {
+		transform: translateY(42px);
 	}
 }

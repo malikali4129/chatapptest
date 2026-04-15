@@ -7,17 +7,34 @@ import {
 	Route,
 	Navigate,
 	useParams,
+	useNavigate,
 } from "react-router";
 import { nanoid } from "nanoid";
 
 import { names, type ChatMessage, type Message } from "../shared";
 
 function App() {
-	const [name] = useState(names[Math.floor(Math.random() * names.length)]);
+	const navigate = useNavigate();
+	const [seedName] = useState(() => names[Math.floor(Math.random() * names.length)]);
+	const [draftName, setDraftName] = useState(seedName);
+	const [activeName, setActiveName] = useState("");
+	const [draftRoom, setDraftRoom] = useState("");
+	const [hasEntered, setHasEntered] = useState(false);
+	const [shareFeedback, setShareFeedback] = useState("");
 	const [messages, setMessages] = useState<ChatMessage[]>([]);
 	const { room } = useParams();
+	const activeRoom = room ?? "";
 	const scrollContainerRef = useRef<HTMLDivElement>(null);
-	const roomCode = useMemo(() => (room ?? "").slice(0, 8).toUpperCase(), [room]);
+	const roomCode = useMemo(() => activeRoom.slice(0, 8).toUpperCase(), [activeRoom]);
+	const shareTimerRef = useRef<number | undefined>(undefined);
+
+	useEffect(() => {
+		setDraftRoom(activeRoom);
+	}, [activeRoom]);
+
+	useEffect(() => {
+		setMessages([]);
+	}, [activeRoom]);
 
 	useEffect(() => {
 		const el = scrollContainerRef.current;
@@ -25,40 +42,86 @@ function App() {
 		el.scrollTop = el.scrollHeight;
 	}, [messages]);
 
+	useEffect(() => {
+		return () => {
+			if (shareTimerRef.current !== undefined) {
+				window.clearTimeout(shareTimerRef.current);
+			}
+		};
+	}, []);
+
+	const setTimedFeedback = (message: string) => {
+		setShareFeedback(message);
+		if (shareTimerRef.current !== undefined) {
+			window.clearTimeout(shareTimerRef.current);
+		}
+		shareTimerRef.current = window.setTimeout(() => {
+			setShareFeedback("");
+		}, 2600);
+	};
+
+	const getShareLink = (roomId: string) => {
+		if (!roomId) return "";
+		return `${window.location.origin}/${roomId}`;
+	};
+
+	const shareInvite = async (roomId: string) => {
+		const roomIdTrimmed = roomId.trim();
+		if (!roomIdTrimmed) {
+			setTimedFeedback("Add a room code to share an invite.");
+			return;
+		}
+
+		const shareLink = getShareLink(roomIdTrimmed);
+		try {
+			if (navigator.share) {
+				await navigator.share({
+					title: "Pulse Chat Invite",
+					text: `Join my room on Pulse Chat: ${roomIdTrimmed}`,
+					url: shareLink,
+				});
+				setTimedFeedback("Invite shared.");
+				return;
+			}
+
+			await navigator.clipboard.writeText(shareLink);
+			setTimedFeedback("Invite link copied to clipboard.");
+		} catch {
+			setTimedFeedback("Could not share invite in this browser.");
+		}
+	};
+
 	const socket = usePartySocket({
 		party: "chat",
-		room,
+		room: hasEntered ? activeRoom : undefined,
 		onMessage: (evt) => {
+			if (!hasEntered) return;
 			const message = JSON.parse(evt.data as string) as Message;
 			if (message.type === "add") {
-				const foundIndex = messages.findIndex((m) => m.id === message.id);
-				if (foundIndex === -1) {
-					// probably someone else who added a message
-					setMessages((messages) => [
-						...messages,
-						{
-							id: message.id,
-							content: message.content,
-							user: message.user,
-							role: message.role,
-						},
-					]);
-				} else {
-					// this usually means we ourselves added a message
-					// and it was broadcasted back
-					// so let's replace the message with the new message
-					setMessages((messages) => {
-						return messages
-							.slice(0, foundIndex)
-							.concat({
+				setMessages((previous) => {
+					const foundIndex = previous.findIndex((m) => m.id === message.id);
+					if (foundIndex === -1) {
+						return [
+							...previous,
+							{
 								id: message.id,
 								content: message.content,
 								user: message.user,
 								role: message.role,
-							})
-							.concat(messages.slice(foundIndex + 1));
-					});
-				}
+							},
+						];
+					}
+
+					return previous
+						.slice(0, foundIndex)
+						.concat({
+							id: message.id,
+							content: message.content,
+							user: message.user,
+							role: message.role,
+						})
+						.concat(previous.slice(foundIndex + 1));
+				});
 			} else if (message.type === "update") {
 				setMessages((messages) =>
 					messages.map((m) =>
@@ -78,6 +141,81 @@ function App() {
 		},
 	});
 
+	if (!hasEntered) {
+		return (
+			<div className="launch-screen">
+				<div className="launch-grid" aria-hidden="true" />
+				<section className="launch-shell">
+					<p className="launch-kicker">NEURAL ROOM INTERFACE</p>
+					<h1 className="launch-title">
+						Pulse <span>Portal</span>
+					</h1>
+					<p className="launch-subtitle">
+						Spin up a shared realtime room in seconds. Pick your identity,
+						confirm the room code, and launch.
+					</p>
+
+					<form
+						className="launch-form"
+						onSubmit={(event) => {
+							event.preventDefault();
+							const cleanedName = draftName.trim() || seedName;
+							const cleanedRoom = draftRoom.trim() || nanoid(10);
+
+							if (cleanedRoom !== activeRoom) {
+								navigate(`/${cleanedRoom}`);
+							}
+
+							setActiveName(cleanedName);
+							setHasEntered(true);
+						}}
+					>
+						<label className="launch-label" htmlFor="display-name">
+							Display Name
+						</label>
+						<input
+							id="display-name"
+							name="display-name"
+							type="text"
+							value={draftName}
+							onChange={(event) => setDraftName(event.currentTarget.value)}
+							autoComplete="off"
+							required
+						/>
+
+						<label className="launch-label" htmlFor="room-code">
+							Room Code
+						</label>
+						<input
+							id="room-code"
+							name="room-code"
+							type="text"
+							value={draftRoom}
+							onChange={(event) => setDraftRoom(event.currentTarget.value)}
+							autoComplete="off"
+							placeholder="example-room-42"
+							required
+						/>
+
+						<div className="launch-actions">
+							<button type="submit">Enter Room</button>
+							<button
+								type="button"
+								className="ghost"
+								onClick={() => shareInvite(draftRoom)}
+							>
+								Share Invite
+							</button>
+						</div>
+					</form>
+					{shareFeedback ? (
+						<p className="share-feedback">{shareFeedback}</p>
+					) : null}
+				</section>
+			</div>
+		);
+	}
+
 	return (
 		<div className="app">
 			<aside className="intro">
@@ -91,16 +229,26 @@ function App() {
 					</p>
 				</div>
 				<div className="meta-list">
-					<div className="meta-item">You are signed in as {name}</div>
+					<div className="meta-item">You are signed in as {activeName}</div>
 					<div className="meta-item">Room code: {roomCode}</div>
 					<div className="meta-item">Messages in room: {messages.length}</div>
+					<div className="meta-item">Share link: {getShareLink(activeRoom)}</div>
 				</div>
 			</aside>
 
 			<section className="chat-panel">
 				<header className="chat-header">
-					<h2 className="chat-title">Live Room</h2>
-					<div className="chat-status">Realtime connected</div>
+					<div>
+						<h2 className="chat-title">Live Room</h2>
+						<div className="chat-status">Realtime connected</div>
+					</div>
+					<button
+						type="button"
+						className="share-room-button"
+						onClick={() => shareInvite(activeRoom)}
+					>
+						Share
+					</button>
 				</header>
 
 				<div className="messages" ref={scrollContainerRef}>
@@ -110,7 +258,7 @@ function App() {
 						</div>
 					) : (
 						messages.map((message) => {
-							const isMine = message.user === name;
+							const isMine = message.user === activeName;
 							return (
 								<article
 									key={message.id}
@@ -138,7 +286,7 @@ function App() {
 					const chatMessage: ChatMessage = {
 						id: nanoid(8),
 						content: text,
-						user: name,
+						user: activeName,
 						role: "user",
 					};
 					setMessages((messages) => [...messages, chatMessage]);
@@ -157,7 +305,7 @@ function App() {
 					<input
 						type="text"
 						name="content"
-						placeholder={`Say something, ${name}...`}
+						placeholder={`Say something, ${activeName}...`}
 						autoComplete="off"
 					/>
 					<button type="submit">Send</button>
