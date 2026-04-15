@@ -4,7 +4,7 @@
 declare namespace Cloudflare {
 	interface GlobalProps {
 		mainModule: typeof import("./index");
-		durableNamespaces: "Chat";
+        durableNamespaces: "Chat";
 	}
 	interface Env {
 		Chat: DurableObjectNamespace<import("./index").Chat>;

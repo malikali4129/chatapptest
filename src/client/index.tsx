@@ -3,247 +3,192 @@ import { usePartySocket } from "partysocket/react";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
 	BrowserRouter,
-	Routes,
-	Route,
 	Navigate,
-	useParams,
+	Route,
+	Routes,
+	useLocation,
 	useNavigate,
+	useParams,
 } from "react-router";
 import { nanoid } from "nanoid";
 
 import { names, type ChatMessage, type Message } from "../shared";
 
-const NAME_STORAGE_KEY = "pulse-display-name";
+const NAME_STORAGE_KEY = "pulse-name";
 
-function getStoredName() {
-	const stored = window.sessionStorage.getItem(NAME_STORAGE_KEY);
-	if (stored && stored.trim()) {
-		return stored.trim();
-	}
+function getFallbackName() {
 	return names[Math.floor(Math.random() * names.length)];
 }
 
-function shareLink(roomId: string) {
-	return `${window.location.origin}/${roomId}`;
+function getSavedName() {
+	const saved = window.sessionStorage.getItem(NAME_STORAGE_KEY);
+	if (saved && saved.trim()) {
+		return saved.trim();
+	}
+	return getFallbackName();
+}
+
+function buildShareUrl(roomCode: string) {
+	return `${window.location.origin}/${roomCode}`;
 }
 
 function HomePage() {
 	const navigate = useNavigate();
-	const [seedName] = useState(getStoredName);
-	const [draftName, setDraftName] = useState(seedName);
-	const [draftRoom, setDraftRoom] = useState("");
-	const [shareFeedback, setShareFeedback] = useState("");
-	const shareTimerRef = useRef<number | undefined>(undefined);
+	const [name, setName] = useState(getSavedName);
 
-	useEffect(() => {
-		return () => {
-			if (shareTimerRef.current !== undefined) {
-				window.clearTimeout(shareTimerRef.current);
-			}
-		};
-	}, []);
-
-	const setTimedFeedback = (message: string) => {
-		setShareFeedback(message);
-		if (shareTimerRef.current !== undefined) {
-			window.clearTimeout(shareTimerRef.current);
-		}
-		shareTimerRef.current = window.setTimeout(() => {
-			setShareFeedback("");
-		}, 2600);
-	};
-
-	const shareInvite = async (roomId: string) => {
-		const roomIdTrimmed = roomId.trim();
-		if (!roomIdTrimmed) {
-			setTimedFeedback("Add a room code to share an invite.");
-			return;
-		}
-
-		const inviteUrl = shareLink(roomIdTrimmed);
-		try {
-			if (navigator.share) {
-				await navigator.share({
-					title: "Pulse Chat Invite",
-					text: `Join my room on Pulse Chat: ${roomIdTrimmed}`,
-					url: inviteUrl,
-				});
-				setTimedFeedback("Invite shared.");
-				return;
-			}
-
-			await navigator.clipboard.writeText(inviteUrl);
-			setTimedFeedback("Invite link copied to clipboard.");
-		} catch {
-			setTimedFeedback("Could not share invite in this browser.");
-		}
-	};
-
-	const launchSession = () => {
-		const cleanedName = draftName.trim() || seedName;
-		const generatedRoom = nanoid(10);
-		window.sessionStorage.setItem(NAME_STORAGE_KEY, cleanedName);
-		navigate(`/${generatedRoom}`);
-	};
-
-	const joinSession = () => {
-		const cleanedName = draftName.trim() || seedName;
-		const cleanedRoom = draftRoom.trim();
-		if (!cleanedRoom) {
-			setTimedFeedback("Enter a room code to join, or use Launch Session.");
-			return;
-		}
-
-		window.sessionStorage.setItem(NAME_STORAGE_KEY, cleanedName);
-		navigate(`/${cleanedRoom}`);
+	const createSession = (event: React.FormEvent) => {
+		event.preventDefault();
+		const cleanName = name.trim() || getFallbackName();
+		window.sessionStorage.setItem(NAME_STORAGE_KEY, cleanName);
+		const roomCode = nanoid(8).toLowerCase();
+		navigate(`/${roomCode}`, {
+			state: { autoJoin: true, suggestedName: cleanName },
+		});
 	};
 
 	return (
-		<div className="launch-screen">
-			<div className="launch-grid" aria-hidden="true" />
-			<section className="launch-shell">
-				<p className="launch-kicker">NEURAL ROOM INTERFACE</p>
-				<h1 className="launch-title">
-					Pulse <span>Portal</span>
-				</h1>
-				<p className="launch-subtitle">
-					Start from this home screen, set your identity, then launch a new
-					session or join an existing room code.
+		<main className="shell">
+			<section className="card">
+				<p className="eyebrow">Realtime Chat</p>
+				<h1 className="title">Start a Session</h1>
+				<p className="subtitle">
+					Create a room, share the URL or QR code, and let others join with their
+					own name.
 				</p>
-
-				<form
-					className="launch-form"
-					onSubmit={(event) => {
-						event.preventDefault();
-						joinSession();
-					}}
-				>
-					<label className="launch-label" htmlFor="display-name">
-						Display Name
+				<form className="stack" onSubmit={createSession}>
+					<label className="label" htmlFor="home-name">
+						Your Name
 					</label>
 					<input
-						id="display-name"
-						name="display-name"
+						id="home-name"
 						type="text"
-						value={draftName}
-						onChange={(event) => setDraftName(event.currentTarget.value)}
+						value={name}
+						onChange={(event) => setName(event.currentTarget.value)}
 						autoComplete="off"
 						required
 					/>
-
-					<label className="launch-label" htmlFor="room-code">
-						Room Code
-					</label>
-					<input
-						id="room-code"
-						name="room-code"
-						type="text"
-						value={draftRoom}
-						onChange={(event) => setDraftRoom(event.currentTarget.value)}
-						autoComplete="off"
-						placeholder="Enter code to join an existing room"
-					/>
-					<p className="launch-hint">
-						No room code yet? Use Launch Session to create one.
-					</p>
-
-					<div className="launch-actions">
-						<button type="button" onClick={launchSession}>
-							Launch Session
-						</button>
-						<button type="submit" className="ghost">
-							Join Session
-						</button>
-						<button
-							type="button"
-							className="ghost subtle"
-							onClick={() => shareInvite(draftRoom)}
-						>
-							Share Invite
-						</button>
-					</div>
+					<button type="submit">Create Session</button>
 				</form>
-				{shareFeedback ? <p className="share-feedback">{shareFeedback}</p> : null}
 			</section>
-		</div>
+		</main>
 	);
 }
 
 function RoomPage() {
 	const navigate = useNavigate();
+	const location = useLocation();
 	const { room } = useParams();
-	const activeRoom = room ?? "";
-	const activeName = useMemo(getStoredName, []);
-	const [shareFeedback, setShareFeedback] = useState("");
-	const [messages, setMessages] = useState<ChatMessage[]>([]);
-	const scrollContainerRef = useRef<HTMLDivElement>(null);
-	const shareTimerRef = useRef<number | undefined>(undefined);
-	const roomCode = useMemo(() => activeRoom.slice(0, 8).toUpperCase(), [activeRoom]);
+	const roomCode = (room || "").trim().toLowerCase();
+
+	const state = (location.state || {}) as {
+		autoJoin?: boolean;
+		suggestedName?: string;
+	};
+
+	const [name, setName] = useState(() => state.suggestedName || getSavedName());
+	const [joined, setJoined] = useState(Boolean(state.autoJoin));
 
 	useEffect(() => {
-		if (!activeRoom) {
+		if (!roomCode) {
 			navigate("/");
-			return;
 		}
-		setMessages([]);
-	}, [activeRoom, navigate]);
+	}, [navigate, roomCode]);
 
 	useEffect(() => {
-		const el = scrollContainerRef.current;
-		if (!el) return;
-		el.scrollTop = el.scrollHeight;
-	}, [messages]);
+		if (!joined) {
+			setName((prev) => prev || getSavedName());
+		}
+	}, [joined]);
+
+	const joinRoom = (event: React.FormEvent) => {
+		event.preventDefault();
+		const cleanName = name.trim() || getFallbackName();
+		window.sessionStorage.setItem(NAME_STORAGE_KEY, cleanName);
+		setName(cleanName);
+		setJoined(true);
+	};
+
+	if (!joined) {
+		return (
+			<main className="shell">
+				<section className="card">
+					<p className="eyebrow">Room {roomCode}</p>
+					<h1 className="title">Join Session</h1>
+					<p className="subtitle">
+						Enter your name to join this room. You will not connect until you
+						press Join.
+					</p>
+					<form className="stack" onSubmit={joinRoom}>
+						<label className="label" htmlFor="room-name">
+							Your Name
+						</label>
+						<input
+							id="room-name"
+							type="text"
+							value={name}
+							onChange={(event) => setName(event.currentTarget.value)}
+							autoComplete="off"
+							required
+						/>
+						<div className="inline-buttons">
+							<button type="submit">Join Room</button>
+							<button type="button" className="ghost" onClick={() => navigate("/")}>
+								Back
+							</button>
+						</div>
+					</form>
+				</section>
+			</main>
+		);
+	}
+
+	return <ChatRoom roomCode={roomCode} name={name} onLeave={() => setJoined(false)} />;
+}
+
+function ChatRoom(props: { roomCode: string; name: string; onLeave: () => void }) {
+	const { roomCode, name, onLeave } = props;
+	const [messages, setMessages] = useState<ChatMessage[]>([]);
+	const [feedback, setFeedback] = useState("");
+	const messagesRef = useRef<HTMLDivElement>(null);
+	const feedbackTimerRef = useRef<number | undefined>(undefined);
+
+	const shareUrl = useMemo(() => buildShareUrl(roomCode), [roomCode]);
+	const qrUrl = useMemo(
+		() =>
+			`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(shareUrl)}`,
+		[shareUrl],
+	);
 
 	useEffect(() => {
 		return () => {
-			if (shareTimerRef.current !== undefined) {
-				window.clearTimeout(shareTimerRef.current);
+			if (feedbackTimerRef.current !== undefined) {
+				window.clearTimeout(feedbackTimerRef.current);
 			}
 		};
 	}, []);
 
-	const setTimedFeedback = (message: string) => {
-		setShareFeedback(message);
-		if (shareTimerRef.current !== undefined) {
-			window.clearTimeout(shareTimerRef.current);
-		}
-		shareTimerRef.current = window.setTimeout(() => {
-			setShareFeedback("");
-		}, 2600);
-	};
-
-	const shareInvite = async () => {
-		if (!activeRoom) return;
-		const inviteUrl = shareLink(activeRoom);
-		try {
-			if (navigator.share) {
-				await navigator.share({
-					title: "Pulse Chat Invite",
-					text: `Join my room on Pulse Chat: ${activeRoom}`,
-					url: inviteUrl,
-				});
-				setTimedFeedback("Invite shared.");
-				return;
-			}
-
-			await navigator.clipboard.writeText(inviteUrl);
-			setTimedFeedback("Invite link copied to clipboard.");
-		} catch {
-			setTimedFeedback("Could not share invite in this browser.");
-		}
-	};
+	useEffect(() => {
+		const el = messagesRef.current;
+		if (!el) return;
+		el.scrollTop = el.scrollHeight;
+	}, [messages]);
 
 	const socket = usePartySocket({
 		party: "chat",
-		room: activeRoom,
+		room: roomCode,
 		onMessage: (evt) => {
 			const message = JSON.parse(evt.data as string) as Message;
+			if (message.type === "all") {
+				setMessages(message.messages);
+				return;
+			}
+
 			if (message.type === "add") {
-				setMessages((previous) => {
-					const foundIndex = previous.findIndex((m) => m.id === message.id);
-					if (foundIndex === -1) {
+				setMessages((existing) => {
+					const index = existing.findIndex((m) => m.id === message.id);
+					if (index === -1) {
 						return [
-							...previous,
+							...existing,
 							{
 								id: message.id,
 								content: message.content,
@@ -252,141 +197,140 @@ function RoomPage() {
 							},
 						];
 					}
-
-					return previous
-						.slice(0, foundIndex)
+					return existing
+						.slice(0, index)
 						.concat({
 							id: message.id,
 							content: message.content,
 							user: message.user,
 							role: message.role,
 						})
-						.concat(previous.slice(foundIndex + 1));
+						.concat(existing.slice(index + 1));
 				});
-			} else if (message.type === "update") {
-				setMessages((existing) =>
-					existing.map((m) =>
-						m.id === message.id
-							? {
-									id: message.id,
-									content: message.content,
-									user: message.user,
-									role: message.role,
-							  }
-							: m,
-					),
-				);
-			} else {
-				setMessages(message.messages);
+				return;
 			}
+
+			setMessages((existing) =>
+				existing.map((m) =>
+					m.id === message.id
+						? {
+								id: message.id,
+								content: message.content,
+								user: message.user,
+								role: message.role,
+						  }
+						: m,
+				),
+			);
 		},
 	});
 
+	const sendMessage = (event: React.FormEvent<HTMLFormElement>) => {
+		event.preventDefault();
+		const input = event.currentTarget.elements.namedItem(
+			"content",
+		) as HTMLInputElement;
+		const text = input.value.trim();
+		if (!text) return;
+
+		const chatMessage: ChatMessage = {
+			id: nanoid(8),
+			content: text,
+			user: name,
+			role: "user",
+		};
+
+		setMessages((existing) => [...existing, chatMessage]);
+		socket.send(
+			JSON.stringify({
+				type: "add",
+				...chatMessage,
+			} satisfies Message),
+		);
+
+		input.value = "";
+	};
+
+	const setFeedbackTimed = (text: string) => {
+		setFeedback(text);
+		if (feedbackTimerRef.current !== undefined) {
+			window.clearTimeout(feedbackTimerRef.current);
+		}
+		feedbackTimerRef.current = window.setTimeout(() => {
+			setFeedback("");
+		}, 2200);
+	};
+
+	const shareRoom = async () => {
+		try {
+			if (navigator.share) {
+				await navigator.share({
+					title: "Chat Session",
+					text: `Join my room: ${roomCode}`,
+					url: shareUrl,
+				});
+				setFeedbackTimed("Shared.");
+				return;
+			}
+			await navigator.clipboard.writeText(shareUrl);
+			setFeedbackTimed("Link copied.");
+		} catch {
+			setFeedbackTimed("Share failed.");
+		}
+	};
+
 	return (
-		<div className="app">
-			<aside className="intro">
-				<div>
-					<h1 className="intro-title">
-						Pulse <span>Chat</span>
-					</h1>
-					<p className="intro-description">
-						A real-time room powered by Durable Objects. Share your room code,
-						start chatting, and watch messages sync instantly for everyone.
-					</p>
-				</div>
-				<div className="meta-list">
-					<div className="meta-item">You are signed in as {activeName}</div>
-					<div className="meta-item">Room code: {roomCode}</div>
-					<div className="meta-item">Messages in room: {messages.length}</div>
-					<div className="meta-item">Share link: {shareLink(activeRoom)}</div>
-					<div className="meta-item">
-						<button
-							type="button"
-							className="share-room-button"
-							onClick={shareInvite}
-						>
-							Share Invite
+		<main className="chat-shell">
+			<section className="sidebar">
+				<p className="eyebrow">Session</p>
+				<h2 className="title-small">{roomCode}</h2>
+				<p className="subtitle">Joined as {name}</p>
+				<div className="share-box">
+					<p className="label">Invite URL</p>
+					<a href={shareUrl}>{shareUrl}</a>
+					<img src={qrUrl} alt="Room QR Code" />
+					<div className="inline-buttons">
+						<button type="button" onClick={shareRoom}>
+							Share
+						</button>
+						<button type="button" className="ghost" onClick={onLeave}>
+							Leave
 						</button>
 					</div>
-					{shareFeedback ? <div className="meta-item">{shareFeedback}</div> : null}
+					{feedback ? <p className="feedback">{feedback}</p> : null}
 				</div>
-			</aside>
+			</section>
 
 			<section className="chat-panel">
-				<header className="chat-header">
-					<div>
-						<h2 className="chat-title">Live Room</h2>
-						<div className="chat-status">Realtime connected</div>
-					</div>
-					<button type="button" className="share-room-button" onClick={shareInvite}>
-						Share
-					</button>
-				</header>
-
-				<div className="messages" ref={scrollContainerRef}>
+				<div className="messages" ref={messagesRef}>
 					{messages.length === 0 ? (
-						<div className="empty-state">
-							No messages yet. Say hi to kick off this room.
-						</div>
+						<p className="empty">No messages yet.</p>
 					) : (
 						messages.map((message) => {
-							const isMine = message.user === activeName;
+							const mine = message.user === name;
 							return (
-								<article
-									key={message.id}
-									className={`message ${isMine ? "mine" : "theirs"}`}
-								>
-									<div className="message-user">{message.user}</div>
-									<div className="message-content">{message.content}</div>
+								<article key={message.id} className={`msg ${mine ? "mine" : "theirs"}`}>
+									<p className="msg-user">{message.user}</p>
+									<p className="msg-body">{message.content}</p>
 								</article>
 							);
 						})
 					)}
 				</div>
-
-				<form
-					className="composer"
-					onSubmit={(e) => {
-						e.preventDefault();
-						const content = e.currentTarget.elements.namedItem(
-							"content",
-						) as HTMLInputElement;
-						const text = content.value.trim();
-						if (!text) {
-							return;
-						}
-						const chatMessage: ChatMessage = {
-							id: nanoid(8),
-							content: text,
-							user: activeName,
-							role: "user",
-						};
-						setMessages((messages) => [...messages, chatMessage]);
-
-						socket.send(
-							JSON.stringify({
-								type: "add",
-								...chatMessage,
-							} satisfies Message),
-						);
-
-						content.value = "";
-					}}
-				>
+				<form className="composer" onSubmit={sendMessage}>
 					<input
 						type="text"
 						name="content"
-						placeholder={`Say something, ${activeName}...`}
+						placeholder="Write a message"
 						autoComplete="off"
 					/>
 					<button type="submit">Send</button>
 				</form>
 			</section>
-		</div>
+		</main>
 	);
 }
 
-// eslint-disable-next-line @typescript-eslint/no-non-null-assertion
 createRoot(document.getElementById("root")!).render(
 	<BrowserRouter>
 		<Routes>
